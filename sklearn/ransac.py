@@ -320,7 +320,7 @@ class RANSAC(BaseEstimator, MetaEstimatorMixin):
                 continue
             if n_inliers_subset == 0:
                 raise ValueError("No inliers found, possible cause is "
-                    "setting residual_threshold ({0}) too low.".format(
+                    "setting inlier_threshold ({0}) too low.".format(
                     self.inlier_threshold))
 
             # extract inlier data set

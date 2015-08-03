@@ -39,10 +39,9 @@ def test_ransacgmm():
     # but we just want to be sure, there's no mean around (-10, -10), 
     # and that the means are at least close to one of the actual means
     for mu in ransac.estimator_.best_estimator_.means_:
-        print dists
         dists = np.sqrt(np.square(mus - mu.reshape((1, -1))).sum(1))
-        assert dists[2] > 9
-        assert (dists[0] < 1) or (dists[1] < 1)
+        assert dists[2] > 10
+        assert (dists[0] < 0.5) or (dists[1] < 0.5)
 
 if __name__ == '__main__':
     test_ransacgmm()
