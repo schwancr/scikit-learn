@@ -407,12 +407,12 @@ class BaseSearchCV(six.with_metaclass(ABCMeta, BaseEstimator,
             raise ValueError("No score function explicitly defined, "
                              "and the estimator doesn't provide one %s"
                              % self.best_estimator_)
-        if self.scoring is not None and hasattr(self.best_estimator_, 'score'):
-            warnings.warn("The long-standing behavior to use the estimator's "
-                          "score function in {0}.score has changed. The "
-                          "scoring parameter is now used."
-                          "".format(self.__class__.__name__),
-                          ChangedBehaviorWarning)
+        #if self.scoring is not None and hasattr(self.best_estimator_, 'score'):
+        #    warnings.warn("The long-standing behavior to use the estimator's "
+        #                  "score function in {0}.score has changed. The "
+        #                  "scoring parameter is now used."
+        #                  "".format(self.__class__.__name__),
+        #                  ChangedBehaviorWarning)
         return self.scorer_(self.best_estimator_, X, y)
 
     @if_delegate_has_method(delegate='estimator')
