@@ -284,6 +284,7 @@ class RANSAC(BaseEstimator, MetaEstimatorMixin):
 
         for self.n_trials_ in range(1, self.max_trials + 1):
 
+            print "trial %d" % self.n_trials_
             # choose random sample set
             subset_idxs = sample_without_replacement(n_samples, min_samples,
                                                      random_state=random_state)
@@ -370,8 +371,12 @@ class RANSAC(BaseEstimator, MetaEstimatorMixin):
                 " `max_trials` randomly ""chosen sub-samples. Consider "
                 "relaxing the ""constraints.")
 
+        print 'here'
+
+        base_estimator.n_jobs = 1
         # estimate final model using all inliers
         base_estimator.fit(X_inlier_best, y_inlier_best)
+        print 'how did I get here?'
 
         self.estimator_ = base_estimator
         self.inlier_mask_ = inlier_mask_best
