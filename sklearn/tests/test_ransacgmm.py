@@ -1,7 +1,7 @@
 
 import numpy as np
 import numpy.testing as npt
-from sklearn.ransac import RANSAC
+from sklearn.ransac2 import RANSAC
 import IPython
 from sklearn import cross_validation
 from sklearn.grid_search import GridSearchCV
@@ -32,9 +32,10 @@ def test_ransacgmm():
     gscv = GridSearchCV(gmm, param_grid={'n_components' : np.arange(1, 10)}, 
                         cv=5, scoring=_scorer)
 
-    ransac = RANSAC(gscv, min_samples=13)
+    ransac = RANSAC(gscv, min_samples=13, stop_n_inliers=100)
     ransac.fit(X)
 
+    print ransac.estimator_.best_estimator_.means_
     # sometimes it gets overfit since there's not a lot of data,
     # but we just want to be sure, there's no mean around (-10, -10), 
     # and that the means are at least close to one of the actual means

@@ -2,18 +2,56 @@
 import numpy as np
 from .base import BaseEstimator, clone
 
-def _get_point_scores(model, X, y):
-    scores = [model.score(X[k:k+1], y[k:k+1]) for k in xrange(X.shape[0])]
+def _get_point_scores(model, X, y=None):
+    if y is None:
+        scores = [model.score(X[k:k + 1]) for k in xrange(X.shape[0])]
+    else:
+        scores = [model.score(X[k:k + 1], y[k:k + 1]) for k in xrange(X.shape[0])]
+
     scores = np.array(scores)
+
     return scores
 
 class RANSAC(BaseEstimator):
+    """
+    The RANSAC paradigm is very simple, and not very
+    elegant, but it's useful for excluding outliers 
+    contained in some dataset. 
+
+    The fitting procedure works like this:
+
+    1) Randomly sample m points from the dataset
+    2) Fit the model to the m points
+    3) Create a new subset of points that are consistent
+        with this model
+    4) If the size of this subset is big enough, then
+        quit, otherwise go to (2) with this subset
+    5) If this procedure hits a dead end then go to
+        (1) and resample m points
+
+    Parameters
+    ----------
+    model : sklearn.BaseEstimator instance
+        Model to fit to some data. Can be any estimator.
+    min_samples : int, optional
+        Number of samples to construct the initial
+        subset
+    max_trials : int, optional
+        Maximum number of trials before giving up
+    inlier_thresh : float, optional
+        The threshold to say whether a point is consistent
+        with a model
+    stop_n_inliers : int, optional
+        Quit successfully whenever the subset contians 
+        this many points
+    """
     def __init__(self, model, min_samples=3, max_trials=100, 
-                 inlier_thresh=None, stop_n_inliers=100):
+                 inlier_thresh=np.log(0.05), stop_n_inliers=100):
         self.base_estimator = model
         self.min_samples = min_samples
         self.max_trials = max_trials
         self.inlier_thresh = inlier_thresh
+        self.stop_n_inliers = stop_n_inliers
 
 
     def fit(self, X, y=None):
@@ -42,7 +80,6 @@ class RANSAC(BaseEstimator):
 
         for k in xrange(self.max_trials):
             this_estimator = clone(self.base_estimator)
-
             this_subset = np.random.permutation(np.arange(n_samples))[:self.min_samples]
             this_X = X[this_subset]
             if supervised:
@@ -50,28 +87,25 @@ class RANSAC(BaseEstimator):
             else:
                 this_y = None
 
-            this_estimator.fit(this_X, this_y)           
+            for i in xrange(self.max_trials):
+                print 'Trial %d.%d (%d inliers / %d points)' % (k, i, len(this_subset), n_samples)
 
-            these_scores = _get_point_scores(this_estimator, X, y)
-            this_score = these_scores[this_subset].sum()
-            for i in xrange(self.max_iters):
-                new_subset = np.where(these_scores < self.inlier_thresh)[0]
-                if set(new_subset) == set(this_subset):
+                this_estimator.fit(this_X, this_y)
+
+                scores = _get_point_scores(this_estimator, X, y)
+                new_subset = np.where(scores > self.inlier_thresh)[0]
+                if len(new_subset) <= len(this_subset):
+                    # we didn't get any better, so GTFO!
                     break
 
-                new_X = X[new_subset]
+                this_subset = new_subset
+                this_X = X[this_subset]
                 if supervised:
-                    new_y = y[new_subset]
+                    this_y = y[this_subset]
                 else:
-                    new_y = None
-                
-                this_estimator.fit(new_X, new_y)
-                new_scores = _get_point_scores(this_estimator, X, y)
-                new_score = new_scores[new_subset].sum()
-                if these_scores[new_subset].sum() > new_scores[new_subset].sum():
-                    this_score = new_scores[new_subset].sum()
-                    these_scores = new_scores
-                else:
+                    this_y = None
+
+                if len(this_subset) > self.stop_n_inliers:
                     break
 
             n_inliers = len(this_subset)
