@@ -284,7 +284,6 @@ class RANSAC(BaseEstimator, MetaEstimatorMixin):
 
         for self.n_trials_ in range(1, self.max_trials + 1):
 
-            print "trial %d" % self.n_trials_
             # choose random sample set
             subset_idxs = sample_without_replacement(n_samples, min_samples,
                                                      random_state=random_state)
@@ -315,14 +314,21 @@ class RANSAC(BaseEstimator, MetaEstimatorMixin):
             # classify data into inliers and outliers
             inlier_mask_subset = scores < inlier_threshold
             n_inliers_subset = np.sum(inlier_mask_subset)
+            print "trial %d (%d inliers / %d points)" % (self.n_trials_, 
+                                                         n_inliers_subset, 
+                                                         len(X))
 
             # less inliers -> skip current random sample
             if n_inliers_subset < n_inliers_best:
                 continue
             if n_inliers_subset == 0:
-                raise ValueError("No inliers found, possible cause is "
+                #raise ValueError("No inliers found, possible cause is "
+                #    "setting inlier_threshold ({0}) too low.".format(
+                #    self.inlier_threshold))
+                print "No inliers found, possible cause is " \
                     "setting inlier_threshold ({0}) too low.".format(
-                    self.inlier_threshold))
+                    self.inlier_threshold)
+                continue
 
             # extract inlier data set
             inlier_idxs_subset = sample_idxs[inlier_mask_subset]

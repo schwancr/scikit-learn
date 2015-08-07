@@ -44,14 +44,22 @@ class RANSAC(BaseEstimator):
     stop_n_inliers : int, optional
         Quit successfully whenever the subset contians 
         this many points
+    point_scorer : callable, optional
+        Function to compute the score of each point, which
+        should correspond to how well the point is 
+        explained by the model (higher score means more
+        consistent with the model).
     """
     def __init__(self, model, min_samples=3, max_trials=100, 
-                 inlier_thresh=np.log(0.05), stop_n_inliers=100):
+                 inlier_thresh=np.log(0.05), stop_n_inliers=100,
+                 point_scorer=_get_point_scores, min_score=-np.inf):
         self.base_estimator = model
         self.min_samples = min_samples
         self.max_trials = max_trials
         self.inlier_thresh = inlier_thresh
         self.stop_n_inliers = stop_n_inliers
+        self.point_scorer = point_scorer
+        self.min_score = min_score
 
 
     def fit(self, X, y=None):
@@ -77,9 +85,9 @@ class RANSAC(BaseEstimator):
         # should have some check statements here
         # to make sure X, and y are good
         n_samples, _ = X.shape
-
         for k in xrange(self.max_trials):
             this_estimator = clone(self.base_estimator)
+            this_estimator.best_score_ = -np.inf
             this_subset = np.random.permutation(np.arange(n_samples))[:self.min_samples]
             this_X = X[this_subset]
             if supervised:
@@ -88,15 +96,22 @@ class RANSAC(BaseEstimator):
                 this_y = None
 
             for i in xrange(self.max_trials):
-                print 'Trial %d.%d (%d inliers / %d points)' % (k, i, len(this_subset), n_samples)
+                print 'Trial %d.%d (%d inliers / %d points | %2d%%) [%f]' % (k, i, len(this_subset), n_samples, len(this_subset) / float(n_samples) * 100, this_estimator.best_score_)
 
                 this_estimator.fit(this_X, this_y)
 
-                scores = _get_point_scores(this_estimator, X, y)
+                scores = self.point_scorer(this_estimator, X, y)
+
+                print scores.min(), scores.mean(), scores.max()
+
                 new_subset = np.where(scores > self.inlier_thresh)[0]
-                if len(new_subset) <= len(this_subset):
-                    # we didn't get any better, so GTFO!
+
+                if set(new_subset) == set(this_subset) or len(new_subset) == 0:
+                    # we are stuck
                     break
+                #if len(new_subset) <= len(this_subset):
+                #    # we didn't get any better, so GTFO!
+                #    break
 
                 this_subset = new_subset
                 this_X = X[this_subset]
@@ -105,8 +120,14 @@ class RANSAC(BaseEstimator):
                 else:
                     this_y = None
 
-                if len(this_subset) > self.stop_n_inliers:
+                if this_estimator.best_score_ < self.min_score:
+                    continue
+
+                if len(this_subset) >= self.stop_n_inliers:
                     break
+
+            if this_estimator.best_score_ < self.min_score:
+                continue
 
             n_inliers = len(this_subset)
             if n_inliers >= self.stop_n_inliers:
