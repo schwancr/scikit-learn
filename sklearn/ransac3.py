@@ -88,10 +88,10 @@ class RANSAC(BaseEstimator):
         n_samples, _ = X.shape
         best_model = {'inds' : [], 'score' : -np.inf, 
                       'model' : None}
-        last_score = -np.inf
         for k in xrange(self.max_trials):
+            last_score = -np.inf
             this_estimator = clone(self.base_estimator)
-            this_estimator.best_score_ = -np.inf
+            #this_estimator.best_score_ = -np.inf
             this_subset = np.random.permutation(np.arange(n_samples))[:self.min_samples]
             this_X = X[this_subset]
             if supervised:
@@ -100,13 +100,19 @@ class RANSAC(BaseEstimator):
                 this_y = None
 
             for i in xrange(10):#self.max_trials):
-                print 'Trial %d.%d (%d inliers / %d points | %2d%%) [%f]' % (k, i, len(this_subset), n_samples, len(this_subset) / float(n_samples) * 100, this_estimator.best_score_)
-
-                this_estimator.fit(this_X, this_y)
+                print 'Trial %d.%d (%d inliers / %d points | %2d%%) [%f]' % (k, i, len(this_subset), n_samples, len(this_subset) / float(n_samples) * 100, last_score)
+                try:
+                    this_estimator.fit(this_X, this_y)
+                except:
+                    # let's just assume this is our fault
+                    # and try restarting the iteration
+                    # (most common problem is fewer points
+                    # than parameters in the model.)
+                    break
 
                 scores = self.point_scorer(this_estimator, X, y)
 
-                new_subset = np.where(scores > self.inlier_thresh)[0]
+                new_subset = np.where((scores > self.inlier_thresh))[0]
 
                 if set(new_subset) == set(this_subset) or len(new_subset) == 0:
                     # we are stuck
