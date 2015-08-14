@@ -1,6 +1,7 @@
 
 import numpy as np
 from .base import BaseEstimator, clone
+from .grid_search import GridSearchCV
 
 def _get_point_scores(model, X, y=None):
     if y is None:
@@ -50,16 +51,16 @@ class RANSAC(BaseEstimator):
         explained by the model (higher score means more
         consistent with the model).
     """
-    def __init__(self, model, min_samples=3, max_trials=100, 
-                 inlier_thresh=np.log(0.05), stop_n_inliers=100,
-                 point_scorer=_get_point_scores, min_score=-np.inf):
+    def __init__(self, model, min_samples=3, max_trials=10, 
+                 inlier_thresh=np.log(0.05), point_scorer=_get_point_scores):
+
+        if not isinstance(model, GridSearchCV):
+            raise ValueError("model must be a GridSearchCV instance")
         self.base_estimator = model
         self.min_samples = min_samples
         self.max_trials = max_trials
         self.inlier_thresh = inlier_thresh
-        self.stop_n_inliers = stop_n_inliers
         self.point_scorer = point_scorer
-        self.min_score = min_score
 
 
     def fit(self, X, y=None):
@@ -85,6 +86,9 @@ class RANSAC(BaseEstimator):
         # should have some check statements here
         # to make sure X, and y are good
         n_samples, _ = X.shape
+        best_model = {'inds' : [], 'score' : -np.inf, 
+                      'model' : None}
+        last_score = -np.inf
         for k in xrange(self.max_trials):
             this_estimator = clone(self.base_estimator)
             this_estimator.best_score_ = -np.inf
@@ -102,8 +106,6 @@ class RANSAC(BaseEstimator):
 
                 scores = self.point_scorer(this_estimator, X, y)
 
-                print scores.min(), scores.mean(), scores.max()
-
                 new_subset = np.where(scores > self.inlier_thresh)[0]
 
                 if set(new_subset) == set(this_subset) or len(new_subset) == 0:
@@ -120,20 +122,25 @@ class RANSAC(BaseEstimator):
                 else:
                     this_y = None
 
-                if this_estimator.best_score_ < self.min_score:
-                    continue
-
-                if len(this_subset) >= self.stop_n_inliers:
+                if (this_estimator.best_score_ - last_score) < (-0.05 * np.abs(last_score)):
                     break
 
-            if this_estimator.best_score_ < self.min_score:
-                continue
+                else:
+                    last_score = this_estimator.best_score_
 
-            n_inliers = len(this_subset)
-            if n_inliers >= self.stop_n_inliers:
-                break
+                if this_estimator.best_score_ > best_model['score']:
+                    best_model['inds'] = this_subset
+                    best_model['model'] = this_estimator
+                    best_model['score'] = this_estimator.best_score_
 
-        self.estimator_ = clone(self.base_estimator)
+        this_subset = best_model['inds']
+        this_X = X[this_subset]
+        if supervised:
+            this_y = y[this_subset]
+        else:
+            this_y = None
+
+        self.estimator_ = clone(best_model['model'])
         self.estimator_.fit(this_X, this_y)
         self.inlier_inds_ = this_subset
 
