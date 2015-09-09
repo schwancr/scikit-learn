@@ -2,6 +2,7 @@
 import numpy as np
 from .base import BaseEstimator, clone
 from .grid_search import GridSearchCV
+import warnings
 
 def _get_point_scores(model, X, y=None):
     if y is None:
@@ -103,7 +104,10 @@ class RANSAC(BaseEstimator):
                 print 'Trial %d.%d (%d inliers / %d points | %2d%%) [%f]' % (k, i, len(this_subset), n_samples, len(this_subset) / float(n_samples) * 100, last_score)
                 try:
                     this_estimator.fit(this_X, this_y)
-                except:
+                except Exception as err:
+                    warnings.warn(err.message)
+                    raise err
+                    
                     # let's just assume this is our fault
                     # and try restarting the iteration
                     # (most common problem is fewer points
