@@ -11,7 +11,7 @@ def _get_point_scores(model, X, y=None):
     else:
         scores = [model.score(X[k:k + 1], y[k:k + 1]) for k in xrange(X.shape[0])]
 
-    scores = np.array(scores)
+    scores = np.log(np.array(scores))
 
     return scores
 
@@ -103,7 +103,7 @@ class RANSAC(BaseEstimator):
         n_samples, _ = X.shape
         best_model = {'inds' : [], 'score' : -np.inf, 
                       'model' : None}
-        for k in xrange(self.max_trials):
+        for k in xrange(1):#self.max_trials):
             last_score = -np.inf
             this_estimator = clone(self.base_estimator)
             #this_estimator.best_score_ = -np.inf
@@ -115,7 +115,7 @@ class RANSAC(BaseEstimator):
             else:
                 this_y = None
 
-            for i in xrange(10):#self.max_trials):
+            for i in xrange(self.max_trials):
                 print 'Trial %d.%d (%d inliers / %d points | %2d%%) [%f]' % (k, i, len(this_subset), n_samples, len(this_subset) / float(n_samples) * 100, last_score)
                 try:
                     this_estimator.fit(this_X, this_y)
@@ -133,12 +133,23 @@ class RANSAC(BaseEstimator):
 
                 new_subset = np.where((scores > self.inlier_thresh))[0]
 
-                if set(new_subset) == set(this_subset) or len(new_subset) < self.min_samples:
-                    # we are stuck
-                    break
-                #if len(new_subset) <= len(this_subset):
-                #    # we didn't get any better, so GTFO!
-                #    break
+                if last_score == -np.inf:
+                    num_samples = self.min_samples
+                else:
+                    diff = this_estimator.best_score_ - last_score + 10
+                    # subtract ten so that when the scores are equal we try to
+                    # add some new data
+                    num_samples = len(this_X) + \
+                        0.2 * len(X) * (1.0 / (1.0 + np.exp(-7e-3 * diff)) - 0.5)
+                    #if this_estimator.best_score_ >= last_score:
+                    #    num_samples = len(this_X) + 0.1 * len(X)
+                    #else:
+                    #    num_samples = 0.8 * len(this_X)
+
+                    num_samples = np.sum(scores > np.mean(scores))
+
+                #new_subset = self.initializer(X, num_samples,
+                #                              likes=scores)
 
                 this_subset = new_subset
                 this_X = X[this_subset]
@@ -147,8 +158,11 @@ class RANSAC(BaseEstimator):
                 else:
                     this_y = None
 
-                if (this_estimator.best_score_ - last_score) < (-0.05 * np.abs(last_score)):
+                #if (this_estimator.best_score_ - last_score) < (-0.2 * np.abs(last_score)):
+                #    break
+                if np.abs(this_estimator.best_score_ - last_score) < 0.005 * np.abs(last_score):
                     break
+
 
                 if this_estimator.best_score_ > best_model['score']:
                     best_model['inds'] = this_subset
